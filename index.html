@@ -2,93 +2,101 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Obrador - Formulador</title>
+    <title>Obrador - Formulador de Helados</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
-        .panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .btn { padding: 10px 20px; cursor: pointer; border-radius: 4px; border: none; color: white; font-weight: bold; }
+        .panel { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .btn { padding: 10px 15px; cursor: pointer; border-radius: 4px; border: none; color: white; font-weight: bold; }
         .btn-guardar { background: #27ae60; }
         .btn-cargar { background: #2980b9; }
-        select, input { padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        .controls { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
     </style>
 </head>
 <body>
 
 <div class="panel">
-    <h1>Guardar y Cargar Recetas</h1>
-    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
-        <input type="text" id="input-nombre-guardar" placeholder="Nombre nueva receta">
-        <button class="btn btn-guardar" onclick="guardarRecetaEnNube()">💾 Guardar Receta</button>
+    <h1>Formulador de Helados</h1>
+    <div class="controls">
+        <input type="text" id="nombre-receta" placeholder="Nombre receta">
+        <button class="btn btn-guardar" onclick="guardarReceta()">💾 Guardar Receta</button>
     </div>
-    <div style="display: flex; gap: 10px; align-items: center;">
-        <select id="select-recetas-guardadas">
-            <option value="">-- Selecciona una receta --</option>
-        </select>
-        <button class="btn btn-cargar" onclick="cargarRecetaDeNube()">📂 CARGAR RECETA</button>
+    <div class="controls">
+        <select id="select-recetas"><option value="">-- Cargar Receta --</option></select>
+        <button class="btn btn-cargar" onclick="cargarReceta()">📂 CARGAR RECETA</button>
     </div>
 </div>
 
 <div class="panel">
     <table>
         <thead><tr><th>Ingrediente</th><th>Gramos</th><th>Acción</th></tr></thead>
-        <tbody id="tabla-receta-body"></tbody>
+        <tbody id="tabla-body"></tbody>
     </table>
+    <div style="margin-top: 15px;">
+        <select id="select-ingredientes"></select>
+        <button onclick="agregarIngrediente()">+ Agregar Ingrediente</button>
+    </div>
 </div>
 
 <script>
-    const URL_GOOGLE_SHEET = "https://script.google.com/macros/s/AKfycbyu6i8IpoFL1QXUQ-IpDlkFDh3Kfv13qpvWgN0On72hT7CdAByJJugdd3ObiUiPxTgN/exec";
+    const URL_GS = "https://script.google.com/macros/s/AKfycbyu6i8IpoFL1QXUQ-IpDlkFDh3Kfv13qpvWgN0On72hT7CdAByJJugdd3ObiUiPxTgN/exec";
     let baseDatos = [];
     let listaRecetas = { cabecera: [], detalle: [] };
-    let receta = [];
+    let recetaActual = [];
 
-    async function cargarTodo() {
-        // Cargar ingredientes
-        const resIng = await fetch(URL_GOOGLE_SHEET);
+    async function init() {
+        // Cargar Ingredientes
+        const resIng = await fetch(URL_GS);
         baseDatos = await resIng.json();
         
-        // Cargar lista de recetas (llamando a la función con el parámetro action)
-        const resRec = await fetch(URL_GOOGLE_SHEET + "?action=cargarRecetas");
+        // Cargar Recetas
+        const resRec = await fetch(URL_GS + "?action=cargarRecetas");
         listaRecetas = await resRec.json();
         
-        // Llenar el selector
-        const selRec = document.getElementById('select-recetas-guardadas');
-        listaRecetas.cabecera.forEach(row => {
-            selRec.innerHTML += `<option value="${row[0]}">${row[1]}</option>`;
-        });
-    }
-
-    function renderReceta() {
-        const tbody = document.getElementById('tabla-receta-body');
-        tbody.innerHTML = '';
-        receta.forEach((item, index) => {
-            tbody.innerHTML += `<tr><td>${item.nombre}</td><td>${item.gramos}</td><td><button onclick="eliminar(${index})">X</button></td></tr>`;
-        });
-    }
-
-    function cargarRecetaDeNube() {
-        const id = document.getElementById('select-recetas-guardadas').value;
-        if (!id) { alert("Por favor, selecciona una receta primero."); return; }
+        // Llenar selects
+        const selIng = document.getElementById('select-ingredientes');
+        baseDatos.forEach(i => selIng.innerHTML += `<option value="${i.NOMBRE}">${i.NOMBRE}</option>`);
         
+        const selRec = document.getElementById('select-recetas');
+        listaRecetas.cabecera.forEach(row => selRec.innerHTML += `<option value="${row[0]}">${row[1]}</option>`);
+    }
+
+    function renderTabla() {
+        const tbody = document.getElementById('tabla-body');
+        tbody.innerHTML = '';
+        recetaActual.forEach((item, index) => {
+            tbody.innerHTML += `<tr><td>${item.nombre}</td><td>${item.gramos}</td><td><button onclick="eliminar(${index})">Eliminar</button></td></tr>`;
+        });
+    }
+
+    function agregarIngrediente() {
+        const nombre = document.getElementById('select-ingredientes').value;
+        recetaActual.push({ nombre: nombre, gramos: 100 });
+        renderTabla();
+    }
+
+    function eliminar(index) {
+        recetaActual.splice(index, 1);
+        renderTabla();
+    }
+
+    async function guardarReceta() {
+        const nombre = document.getElementById('nombre-receta').value;
+        const payload = { action: 'guardarReceta', nombre: nombre, ingredientes: recetaActual };
+        await fetch(URL_GS, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+        alert("Receta guardada exitosamente");
+    }
+
+    function cargarReceta() {
+        const id = document.getElementById('select-recetas').value;
+        if (!id) return;
         const detalles = listaRecetas.detalle.filter(row => String(row[0]) === String(id));
-        receta = detalles.map(row => ({ nombre: row[1], gramos: row[2] }));
-        renderReceta();
-        alert("¡Receta cargada!");
+        recetaActual = detalles.map(row => ({ nombre: row[1], gramos: row[2] }));
+        renderTabla();
     }
 
-    async function guardarRecetaEnNube() {
-        const nombre = document.getElementById('input-nombre-guardar').value;
-        if(!nombre) { alert("Ponle un nombre!"); return; }
-        const payload = { action: 'guardarReceta', nombre: nombre, ingredientes: receta };
-        await fetch(URL_GOOGLE_SHEET, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-        alert("¡Receta guardada!");
-    }
-
-    function eliminar(index) { receta.splice(index, 1); renderReceta(); }
-
-    cargarTodo();
+    init();
 </script>
 </body>
 </html>
