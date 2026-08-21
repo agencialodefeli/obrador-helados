@@ -3,74 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Obrador - Formulador de Helados</title>
+    <title>Obrador - Formulador</title>
     <style>
-        body { font-family: sans-serif; background: #f4f7f6; padding: 20px; }
-        .container { max-width: 1000px; margin: auto; background: white; padding: 20px; border-radius: 8px; }
-        .btn { background: #27ae60; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 4px; }
-        .btn-primary { background: #2980b9; }
+        body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
+        .panel { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .btn { padding: 10px 20px; cursor: pointer; border-radius: 4px; border: none; color: white; font-weight: bold; }
+        .btn-guardar { background: #27ae60; }
+        .btn-cargar { background: #2980b9; }
+        select, input { padding: 8px; border-radius: 4px; border: 1px solid #ccc; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-        th { background-color: #3498db; color: white; }
-        .panel-recetas { background: #f8f9fa; padding: 15px; border-radius: 6px; margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>Obrador - Fórmula Activa</h1>
-
-    <!-- Panel de Guardado y Carga -->
-    <div class="panel-recetas">
-        <input type="text" id="input-nombre-guardar" placeholder="Nombre receta...">
-        <button class="btn" onclick="guardarRecetaEnNube()">💾 Guardar</button>
-        
-        <select id="select-recetas-guardadas">
-            <option value="">-- Cargar receta --</option>
-        </select>
-        <button class="btn btn-primary" onclick="cargarRecetaDeNube()">📂 Cargar</button>
+<div class="panel">
+    <h1>Guardar y Cargar Recetas</h1>
+    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+        <input type="text" id="input-nombre-guardar" placeholder="Nombre nueva receta">
+        <button class="btn btn-guardar" onclick="guardarRecetaEnNube()">💾 Guardar Receta</button>
     </div>
-
-    <table>
-        <thead>
-            <tr><th>Ingrediente</th><th>Cantidad (g)</th><th>Acción</th></tr>
-        </thead>
-        <tbody id="tabla-receta-body"></tbody>
-    </table>
-    
-    <div style="margin-top: 20px;">
-        <select id="select-nuevo-ing"></select>
-        <button onclick="agregarAIngredientesReceta()">+ Agregar</button>
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <select id="select-recetas-guardadas">
+            <option value="">-- Selecciona una receta --</option>
+        </select>
+        <button class="btn btn-cargar" onclick="cargarRecetaDeNube()">📂 CARGAR RECETA</button>
     </div>
 </div>
 
-<script>
-    // IMPORTANTE: Asegúrate que esta sea tu URL de despliegue actual
-    const URL_GOOGLE_SHEET = "https://script.google.com/macros/s/AKfycbyu6i8IpoFL1QXUQ-IpDlkFDh3Kfv13qpvWgN0On72hT7CdAByJJugdd3ObiUiPxTgN/exec";
+<div class="panel">
+    <table>
+        <thead><tr><th>Ingrediente</th><th>Gramos</th><th>Acción</th></tr></thead>
+        <tbody id="tabla-receta-body"></tbody>
+    </table>
+</div>
 
+<script>
+    const URL_GOOGLE_SHEET = "https://script.google.com/macros/s/AKfycbyu6i8IpoFL1QXUQ-IpDlkFDh3Kfv13qpvWgN0On72hT7CdAByJJugdd3ObiUiPxTgN/exec";
     let baseDatos = [];
     let listaRecetas = { cabecera: [], detalle: [] };
-    let receta = [{ nombre: "Leche", gramos: 605 }, { nombre: "Crema/Nata 35% GRASA", gramos: 120 }];
+    let receta = [];
 
     async function cargarTodo() {
-        // 1. Cargar Ingredientes
+        // Cargar ingredientes
         const resIng = await fetch(URL_GOOGLE_SHEET);
         baseDatos = await resIng.json();
         
-        // 2. Cargar lista de recetas
+        // Cargar lista de recetas (llamando a la función con el parámetro action)
         const resRec = await fetch(URL_GOOGLE_SHEET + "?action=cargarRecetas");
         listaRecetas = await resRec.json();
         
-        actualizarSelects();
-        renderReceta();
-    }
-
-    function actualizarSelects() {
-        // Select nuevo ingrediente
-        const selIng = document.getElementById('select-nuevo-ing');
-        baseDatos.forEach(i => selIng.innerHTML += `<option value="${i.NOMBRE}">${i.NOMBRE}</option>`);
-        
-        // Select cargar recetas
+        // Llenar el selector
         const selRec = document.getElementById('select-recetas-guardadas');
         listaRecetas.cabecera.forEach(row => {
             selRec.innerHTML += `<option value="${row[0]}">${row[1]}</option>`;
@@ -85,27 +68,25 @@
         });
     }
 
-    function eliminar(index) { receta.splice(index, 1); renderReceta(); }
-
-    function agregarAIngredientesReceta() {
-        const nombre = document.getElementById('select-nuevo-ing').value;
-        receta.push({ nombre: nombre, gramos: 100 });
+    function cargarRecetaDeNube() {
+        const id = document.getElementById('select-recetas-guardadas').value;
+        if (!id) { alert("Por favor, selecciona una receta primero."); return; }
+        
+        const detalles = listaRecetas.detalle.filter(row => String(row[0]) === String(id));
+        receta = detalles.map(row => ({ nombre: row[1], gramos: row[2] }));
         renderReceta();
+        alert("¡Receta cargada!");
     }
 
     async function guardarRecetaEnNube() {
         const nombre = document.getElementById('input-nombre-guardar').value;
+        if(!nombre) { alert("Ponle un nombre!"); return; }
         const payload = { action: 'guardarReceta', nombre: nombre, ingredientes: receta };
         await fetch(URL_GOOGLE_SHEET, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
-        alert("¡Guardada!");
+        alert("¡Receta guardada!");
     }
 
-    function cargarRecetaDeNube() {
-        const id = document.getElementById('select-recetas-guardadas').value;
-        const detalles = listaRecetas.detalle.filter(row => String(row[0]) === id);
-        receta = detalles.map(row => ({ nombre: row[1], gramos: row[2] }));
-        renderReceta();
-    }
+    function eliminar(index) { receta.splice(index, 1); renderReceta(); }
 
     cargarTodo();
 </script>
