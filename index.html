@@ -91,12 +91,12 @@
             </div>
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <input type="text" id="input-nombre-guardar" placeholder="Nombre de tu receta..." style="width: 180px;">
-                <button class="btn" onclick="guardarRecetaPersonal()">💾 Guardar Receta</button>
+                <button class="btn" onclick="guardarRecetaSegura()">💾 Guardar Receta</button>
                 <select id="select-recetas-guardadas" style="padding: 6px; width: 180px;">
                     <option value="">-- Mis Recetas Guardadas --</option>
                 </select>
                 <button class="btn btn-warning" onclick="cargarRecetaPersonal()">📂 Cargar</button>
-                <button class="btn btn-danger" onclick="eliminarRecetaPersonal()" style="padding: 8px 10px;" title="Eliminar receta seleccionada">🗑️</button>
+                <button class="btn btn-danger" onclick="eliminarRecetaSegura()" style="padding: 8px 10px;" title="Eliminar receta seleccionada">🗑️</button>
             </div>
         </div>
 
@@ -122,7 +122,7 @@
 
         <div style="text-align: center; margin: 20px 0;">
             <select id="select-nuevo-ing" style="padding: 8px; width: 300px;"></select>
-            <button class="btn" onclick="agregarAIngredientesReceta()">+ Agregar a la Receta</button>
+            <button class="btn" onclick="agregarAIngredientesRecetaSeguro()">+ Agregar a la Receta</button>
         </div>
 
         <h2>Parámetros y Control de Calidad</h2>
@@ -186,6 +186,7 @@
 
 <script>
     const URL_GOOGLE_SHEET = "https://script.google.com/macros/s/AKfycbyu6i8IpoFL1QXUQ-IpDlkFDh3Kfv13qpvWgN0On72hT7CdAByJJugdd3ObiUiPxTgN/exec";
+    const PASSWORD_OBRADOR = "1418"; // <-- AQUÍ PUEDES CAMBIAR TU CONTRASEÑA
 
     let baseDatos = [];
     let receta = [
@@ -199,6 +200,16 @@
     let nombreRecetaActual = "";
     let vistaActual = 'balance';
 
+    function verificarPassword() {
+        let pass = prompt("🔐 Ingresa el código de seguridad del obrador para modificar la receta:");
+        if (pass === null) return false; // Canceló
+        if (pass !== PASSWORD_OBRADOR) {
+            alert("❌ Código incorrecto. No se pueden realizar cambios.");
+            return false;
+        }
+        return true;
+    }
+
     async function cargarBaseDatosDesdeNube() {
         const indicator = document.getElementById('loading-indicator');
         indicator.style.display = 'block';
@@ -208,7 +219,6 @@
             const response = await fetch(URL_GOOGLE_SHEET);
             const data = await response.json();
             
-            // Adaptar los datos que vienen de Google Sheets
             baseDatos = data.map((item, index) => ({
                 id: index + 1,
                 categoria: item.CATEGORIA || "General",
@@ -250,7 +260,9 @@
         }
     }
 
-    function guardarRecetaPersonal() {
+    function guardarRecetaSegura() {
+        if (!verificarPassword()) return;
+
         let nombre = document.getElementById('input-nombre-guardar').value.trim();
         if (!nombre) {
             nombre = prompt("Ingresa un nombre para tu receta:", nombreRecetaActual || "Mi Receta");
@@ -295,9 +307,11 @@
         }
     }
 
-    function eliminarRecetaPersonal() {
+    function eliminarRecetaSegura() {
         const nombre = document.getElementById('select-recetas-guardadas').value;
         if (!nombre) return;
+
+        if (!verificarPassword()) return;
 
         if (confirm(`¿Eliminar receta "${nombre}"?`)) {
             let recetasGuardadas = JSON.parse(localStorage.getItem('obrador_mis_recetas')) || {};
@@ -388,7 +402,7 @@
                 optgroup.label = cat;
                 itemsDeCat.forEach(ing => {
                     const option = document.createElement('option');
-                    option.value = ing.nombre; // Usamos el nombre como identificador principal
+                    option.value = ing.nombre;
                     option.text = ing.nombre;
                     optgroup.appendChild(option);
                 });
@@ -418,14 +432,14 @@
             tbody.innerHTML += `
                 <tr>
                     <td><strong>${info.nombre}</strong> <span style="font-size:11px; color:#888;">[${info.categoria}]</span></td>
-                    <td><input type="text" value="${g}" onchange="cambiarGramosReceta(${index}, this.value)"></td>
+                    <td><input type="text" value="${g}" onchange="cambiarGramosRecetaSeguro(${index}, this.value)"></td>
                     <td>${(g * (info.graso / 100)).toFixed(3)}</td>
                     <td>${(g * (info.st / 100)).toFixed(3)}</td>
                     <td>${(g * (info.pod / 100)).toFixed(3)}</td>
                     <td>${(g * (info.pac / 100)).toFixed(3)}</td>
                     <td>${(g * (info.lactosa / 100)).toFixed(3)}</td>
                     <td>${(g * (info.proteina / 100)).toFixed(3)}</td>
-                    <td><button class="btn btn-danger" onclick="eliminarDeReceta(${index})">X</button></td>
+                    <td><button class="btn btn-danger" onclick="eliminarDeRecetaSeguro(${index})">X</button></td>
                 </tr>
             `;
         });
@@ -469,7 +483,6 @@
             let textoProd = prodGramos >= 1000 ? `${prodGramos.toFixed(1)} g <span style="color:#27ae60; font-weight:bold;">(${(prodGramos/1000).toFixed(3)} kg)</span>` : `${prodGramos.toFixed(1)} g`;
 
             tbody.innerHTML += `
-                rows...
                 <tr>
                     <td style="text-align: left; padding-left: 15px;"><strong>${info.nombre}</strong> <span style="font-size:11px; color:#888;">[${info.categoria}]</span></td>
                     <td>${baseGramos} g</td>
@@ -487,17 +500,23 @@
         `;
     }
 
-    function cambiarGramosReceta(index, val) {
+    function cambiarGramosRecetaSeguro(index, val) {
+        if (!verificarPassword()) {
+            renderReceta(); // Revierte el cambio visual si pone mal la contraseña
+            return;
+        }
         receta[index].gramos = parseFloat(val.replace(',', '.')) || 0;
         renderReceta();
     }
 
-    function eliminarDeReceta(index) {
+    function eliminarDeRecetaSeguro(index) {
+        if (!verificarPassword()) return;
         receta.splice(index, 1);
         renderReceta();
     }
 
-    function agregarAIngredientesReceta() {
+    function agregarAIngredientesRecetaSeguro() {
+        if (!verificarPassword()) return;
         const nombreIng = document.getElementById('select-nuevo-ing').value;
         if(!nombreIng) return;
         const existe = receta.find(r => r.nombre === nombreIng);
@@ -506,7 +525,6 @@
         renderReceta();
     }
 
-    // Cargar los datos al iniciar la app
     cargarBaseDatosDesdeNube();
     actualizarSelectRecetasGuardadas();
 </script>
